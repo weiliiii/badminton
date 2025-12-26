@@ -1,0 +1,533 @@
+body {
+    margin: 0;
+    background: #dbf6ff;
+    font-family: "Microsoft JhengHei", sans-serif;
+}
+
+.layout {
+    display: flex;
+    padding: 20px;
+}
+
+.qr-box {
+    width: 160px;
+    text-align: center;
+    margin-right: 25px;
+}
+
+.qr {
+    width: 150px;
+    height: 150px;
+    border-radius: 10px;
+}
+
+.main {
+    flex: 1;
+    text-align: center;
+}
+
+.title {
+    font-size: 32px;
+    margin-top: 5px;
+    color: #3e788d;
+}
+
+.input-row {
+    margin-top: 15px;
+    margin-bottom: 15px;
+}
+
+input {
+    padding: 10px;
+    width: 200px;
+    border-radius: 10px;
+    border: 1px solid #6fc4e2;
+    outline: none;
+}
+
+button {
+    padding: 10px 15px;
+    background: #6fc4e2;
+    border: none;
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #4d94ad;
+}
+
+.flex-g {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-around;
+}
+
+.rest-show {
+    width: 20%;
+}
+
+.grid {
+    width: 75%;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-gap: 25px;
+}
+
+.card {
+    width: 100%;
+    background: #cdf2ff;
+    border: 2px dashed #6fc4e2;
+    border-radius: 15px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.card h2 {
+    color: #4a9ab7;
+    margin-bottom: 10px;
+}
+
+.list {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    min-height: 190px;    
+    width: 100%;
+}
+
+.rest-show .list {
+    padding: 0 0 1rem 0;
+}
+
+.player-box {
+    width: 75%;
+    background: white;
+    padding: 8px;
+    border-radius: 12px;
+    border: 1px solid #6fc4e2;
+    text-align: center;
+    cursor: grab;  /* 新增：滑鼠變抓手 */
+    user-select: none;  /* 新增：避免選取文字 */
+}
+
+.player-box:active {
+    cursor: grabbing;  /* 新增：拖拉中的樣式 */
+}
+
+.drag-over {
+    border: 3px solid #4d94ad !important;
+    background: #e8f7fc !important;
+    box-shadow: inset 0 0 10px rgba(111, 196, 226, 0.5);
+}
+
+.small-btn {
+    margin: 10px;
+    width: 90%;
+    background: #6fc4e2;
+}
+
+/* Modal 樣式 */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 15px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+    background: #46b6dd;
+    color: white;
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.close {
+    font-size: 28px;
+    cursor: pointer;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.modal-footer {
+    padding: 20px;
+    text-align: right;
+    border-top: 1px solid #eee;
+}
+
+.btn-danger {
+    background: #e74c3c;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-right: 10px;
+}
+
+.btn-danger:hover {
+    background: #c0392b;
+}
+
+.btn-cancel {
+    background: #95a5a6;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.btn-cancel:hover {
+    background: #7f8c8d;
+}
+
+.player-checkbox {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.player-checkbox input {
+    width: 10%;
+    margin-right: 10px;
+    transform: scale(1.2);
+}
+
+.player-checkbox label {
+    margin: 0;
+    flex: 1;
+    cursor: pointer;
+}
+
+.count {
+    font-size: 0.8em;
+    color: #339cc2;
+    font-weight: bold;
+}
+
+/* 固定成員樣式 */
+/* .player-box.fixed-member {
+    background: linear-gradient(135deg, #fff9e6 0%, #fff3cc 100%);
+    border-color: #f0c14b;
+    position: relative;
+}
+
+.player-box.fixed-member::before {
+    content: "";
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    font-size: 12px;
+} */
+
+/* 季繳標籤 */
+.fixed-badge {
+    background: #f0c14b;
+    color: #7a5900;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    margin-right: 6px;
+    font-weight: bold;
+}
+
+/* 季繳成員按鈕 */
+.btn-member {
+    background: #f0c14b !important;
+    color: #7a5900 !important;
+}
+
+.btn-member:hover {
+    background: #d4a833 !important;
+}
+
+/* 季繳成員列表項目 */
+.member-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 15px;
+    border-bottom: 1px solid #eee;
+    font-size: 16px;
+}
+
+.member-item:last-child {
+    border-bottom: none;
+}
+
+.member-num {
+    background: #f0c14b;
+    color: #7a5900;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin-right: 12px;
+    font-size: 14px;
+}
+
+
+
+/* 手機觸控優化 */
+@media (hover: none) {
+    .player-box {
+        touch-action: none;  /* 避免滾動干擾 */
+    }
+    
+    .list {
+        min-height: 140px;  /* 手機點擊區加大 */
+    }
+}
+
+/* 觸控拖曳中的複製品樣式 */
+.touch-dragging {
+    background: white !important;
+    border: 2px solid #4d94ad !important;
+    border-radius: 12px;
+    padding: 8px 16px;
+    width: auto !important;
+    min-width: 80px;
+    text-align: center;
+}
+
+.touch-dragging.fixed-member {
+    background: linear-gradient(135deg, #fff9e6 0%, #fff3cc 100%) !important;
+    border-color: #f0c14b !important;
+}
+
+/* 確保拖曳時頁面不會滾動 */
+body.touch-dragging-active {
+    overflow: hidden;
+    touch-action: none;
+}
+
+/* ===== 平板響應式佈局 (540px ~ 800px) ===== */
+@media (max-width: 800px) and (min-width: 320px) {
+    .flex-g {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    /* 休息區移到最底部 */
+    .rest-show {
+        width: 100%;
+        order: 3;  /* 排到最後 */
+        margin-top: 15px;
+    }
+    
+    .rest-show .card {
+        width: 100%;
+    }
+    
+    .rest-show .list {
+        min-height: 100px;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        padding: 10px;
+        gap: 8px;
+    }
+    
+    .rest-show .player-box {
+        width: auto;
+        min-width: 70px;
+        padding: 8px 12px;
+    }
+    
+    /* 場地和等待區的網格 */
+    .grid {
+        width: 100%;
+        order: 1;  /* 排到最前 */
+        grid-template-columns: repeat(3, 1fr);
+        grid-gap: 12px;
+    }
+    
+    /* 場地卡片 */
+    .grid .card {
+        min-height: 160px;
+    }
+    
+    .grid .list {
+        min-height: 80px;
+    }
+    
+    /* 標題縮小 */
+    .title {
+        font-size: 22px;
+    }
+    
+    .card h2 {
+        font-size: 14px;
+        margin: 8px 0 5px 0;
+    }
+    
+    /* 按鈕縮小 */
+    .input-row {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 6px;
+        padding: 0 10px;
+    }
+    
+    .input-row input {
+        width: 140px;
+        padding: 8px;
+        font-size: 14px;
+    }
+    
+    .input-row button {
+        padding: 8px 10px;
+        font-size: 12px;
+    }
+    
+    .small-btn {
+        padding: 6px;
+        font-size: 11px;
+        margin: 5px;
+    }
+    
+    .player-box {
+        font-size: 14px;
+        padding: 6px;
+    }
+}
+
+/* ===== 手機響應式佈局 (< 540px) ===== */
+@media (max-width: 319px) {
+    .layout {
+        padding: 10px;
+    }
+    
+    .flex-g {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    /* 休息區移到最底部 */
+    .rest-show {
+        width: 100%;
+        order: 3;
+        margin-top: 15px;
+    }
+    
+    .rest-show .card {
+        width: 100%;
+    }
+    
+    .rest-show .list {
+        min-height: 80px;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        padding: 10px;
+        gap: 6px;
+    }
+    
+    .rest-show .player-box {
+        width: auto;
+        min-width: 60px;
+        padding: 6px 10px;
+        font-size: 12px;
+    }
+    
+    /* 場地和等待區：2列顯示 */
+    .grid {
+        width: 100%;
+        order: 1;
+        grid-template-columns: repeat(2, 1fr);
+        grid-gap: 10px;
+    }
+    
+    .grid .card {
+        min-height: 140px;
+    }
+    
+    .grid .list {
+        min-height: 60px;
+    }
+    
+    /* 標題縮小 */
+    .title {
+        font-size: 20px;
+        margin-bottom: 10px;
+    }
+    
+    .card h2 {
+        font-size: 13px;
+        margin: 6px 0 4px 0;
+    }
+    
+    /* 按鈕區域 */
+    .input-row {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 5px;
+        padding: 0 5px;
+    }
+    
+    .input-row input {
+        width: 120px;
+        padding: 8px;
+        font-size: 14px;
+    }
+    
+    .input-row button {
+        padding: 8px 8px;
+        font-size: 11px;
+    }
+    
+    .small-btn {
+        padding: 5px;
+        font-size: 10px;
+        margin: 4px;
+    }
+    
+    .player-box {
+        font-size: 12px;
+        padding: 5px;
+        width: 80%;
+    }
+    
+    /* Modal 調整 */
+    .modal-content {
+        width: 95%;
+        max-height: 85vh;
+    }
+    
+    .modal-header {
+        padding: 15px;
+    }
+    
+    .modal-header h3 {
+        font-size: 16px;
+    }
+}

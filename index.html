@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+
+<head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>羽球排隊系統</title>
+        <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+        <div class="layout">
+
+                <!-- QR Code 區塊 -->
+                <!-- <div class="qr-box">
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://example.com"
+                                class="qr">
+                        <p>即時排隊狀態</p>
+                </div> -->
+
+                <div class="main">
+
+                        <!-- 標題 -->
+                        <h1 class="title">週四菜鳥羽球團🏸</h1>
+
+                        <!-- 輸入列 -->
+                        <div class="input-row">
+                                <input type="text" id="playerInput" placeholder="輸入隊員名稱">
+                                <button onclick="addPlayer()">新增隊員</button>
+                                <button onclick="resetAll()">重置</button>
+                                <button onclick="removePlayer()">刪除隊員</button>
+                                <button onclick="showMemberList()" class="btn-member">季繳成員</button>
+                        </div>
+
+                        <div class="flex-g">
+                                <!-- 左側休息區 -->
+                                <div class="rest-show">
+                                        <div class="card">
+                                                 <h2 id="rest-title">休息區 <span class="count">(0/0)</span></h2>
+                                                <div class="list" id="rest"></div>
+                                        </div>
+                                </div>
+
+                                <!-- 多格子區域 -->
+                                <div class="grid">
+
+                                        <div class="card">
+                                                <h2 id="court1-title">場地 1 <span class="count">(0/4)</span></h2>
+                                                <div id="court1" class="list court"></div>
+                                                <button onclick="endMatch('court1')" class="small-btn">結束比賽</button>
+                                        </div>
+
+                                        <div class="card">
+                                                <h2 id="court2-title">場地 2 <span class="count">(0/4)</span></h2>
+                                                <div id="court2" class="list court"></div>
+                                                <button onclick="endMatch('court2')" class="small-btn">結束比賽</button>
+                                        </div>
+
+                                        <div class="card">
+                                                <h2 id="court3-title">場地 3 <span class="count">(0/4)</span></h2>
+                                                <div id="court3" class="list court"></div>
+                                                <button onclick="endMatch('court3')" class="small-btn">結束比賽</button>
+                                        </div>
+
+                                        <div class="card">
+                                                <h2>等待順位 1</h2>
+                                                <div id="wait1" class="list wait"></div>
+                                        </div>
+
+                                        <div class="card">
+                                                <h2>等待順位 2</h2>
+                                                <div id="wait2" class="list wait"></div>
+                                        </div>
+
+                                        <div class="card">
+                                                <h2>等待順位 3</h2>
+                                                <div id="wait3" class="list wait"></div>
+                                        </div>
+
+                                </div>
+                        </div>
+
+                </div>
+
+                <!-- 刪除隊員 Modal -->
+                <div id="deleteModal" class="modal" style="display: none;">
+                        <div class="modal-content">
+                                <div class="modal-header">
+                                        <h3>刪除隊員</h3>
+                                        <span class="close" onclick="closeDeleteModal()">&times;</span>
+                                </div>
+                                <div class="modal-body">
+                                        <div id="playerList" style="max-height: 300px; overflow-y: auto;"></div>
+                                </div>
+                                <div class="modal-footer">
+                                        <button onclick="deleteSelectedPlayers()" class="btn-danger">刪除選取</button>
+                                        <button onclick="closeDeleteModal()" class="btn-cancel">取消</button>
+                                </div>
+                        </div>
+                </div>
+
+                <!-- 季繳成員 Modal -->
+                <div id="memberModal" class="modal" style="display: none;">
+                        <div class="modal-content">
+                                <div class="modal-header" style="background: #f0c14b;">
+                                        <h3>⭐ 季繳成員名單</h3>
+                                        <span class="close" onclick="closeMemberModal()">&times;</span>
+                                </div>
+                                <div class="modal-body">
+                                        <p style="color: #666; margin-bottom: 15px;">以下成員每次開啟網頁都會自動出現：</p>
+                                        <div id="memberList"></div>
+                                </div>
+                                <div class="modal-footer">
+                                        <button onclick="closeMemberModal()" class="btn-cancel">關閉</button>
+                                </div>
+                        </div>
+                </div>
+
+        </div>
+
+        <script src="js.js"></script>
+</body>
+
+</html>
