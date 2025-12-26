@@ -12,11 +12,6 @@ const FIXED_MEMBERS = [
     "宥蓁"
 ];
 
-// ===== Firebase 設定 =====
-const FIRESTORE_DOC = "games/badminton"; // Firestore 文件路徑
-let isOnline = false;
-let unsubscribe = null; // 用於取消監聽
-
 function createPlayer(name, isFixed = false) {
     const div = document.createElement("div");
     div.className = "player-box";
@@ -29,10 +24,10 @@ function createPlayer(name, isFixed = false) {
     return div;
 }
 
+const STORAGE_KEY = "badminton-players";
 const MAX_PLAYERS_PER_COURT = 4;
 const MAX_PLAYERS_PER_WAIT = 4;
 
-// ===== Firebase 儲存（即時同步）=====
 function savePlayers() {
     const allPlayers = {};
     document.querySelectorAll(".player-box").forEach(box => {
@@ -40,57 +35,13 @@ function savePlayers() {
         const parentId = box.parentElement.id;
         allPlayers[name] = parentId;
     });
-    
-    // 儲存到 Firebase
-    db.doc(FIRESTORE_DOC).set({
-        players: allPlayers,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }).then(() => {
-        console.log("✅ 資料已同步到雲端");
-    }).catch(error => {
-        console.error("❌ 同步失敗:", error);
-        // 失敗時備份到 localStorage
-        localStorage.setItem("badminton-backup", JSON.stringify(allPlayers));
-    });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(allPlayers));
 }
 
-// ===== Firebase 載入（即時監聽）=====
 function loadPlayers() {
-    showLoadingIndicator();
+    const data = localStorage.getItem(STORAGE_KEY);
+    const positions = data ? JSON.parse(data) : {};
     
-    // 設定即時監聽
-    unsubscribe = db.doc(FIRESTORE_DOC).onSnapshot(
-        (doc) => {
-            isOnline = true;
-            updateConnectionStatus(true);
-            
-            if (doc.exists) {
-                const data = doc.data();
-                const positions = data.players || {};
-                renderPlayers(positions);
-                console.log("📥 收到雲端資料更新");
-            } else {
-                // 文件不存在，初始化固定成員
-                console.log("📝 初始化資料...");
-                initializeDefaultPlayers();
-            }
-            
-            hideLoadingIndicator();
-        },
-        (error) => {
-            console.error("❌ 監聽錯誤:", error);
-            isOnline = false;
-            updateConnectionStatus(false);
-            
-            // 離線時從 localStorage 載入
-            loadFromLocalBackup();
-            hideLoadingIndicator();
-        }
-    );
-}
-
-// 渲染玩家（根據位置資料）
-function renderPlayers(positions) {
     const areas = {
         "rest": document.getElementById("rest"),
         "court1": document.getElementById("court1"),
@@ -101,12 +52,7 @@ function renderPlayers(positions) {
         "wait3": document.getElementById("wait3")
     };
     
-    // 清空所有區域
-    Object.values(areas).forEach(area => {
-        if (area) area.innerHTML = "";
-    });
-    
-    // 1. 先載入固定成員
+    // 1. 先載入固定成員（每次開啟都會出現）
     FIXED_MEMBERS.forEach(name => {
         const areaId = positions[name] || "rest";
         if (areas[areaId]) {
@@ -116,8 +62,9 @@ function renderPlayers(positions) {
         }
     });
     
-    // 2. 再載入非固定成員
+    // 2. 再載入非固定成員（臨時新增的）
     Object.entries(positions).forEach(([name, areaId]) => {
+        // 跳過固定成員（已經載入過了）
         if (FIXED_MEMBERS.includes(name)) return;
         
         if (areas[areaId]) {
@@ -129,97 +76,6 @@ function renderPlayers(positions) {
     
     initDragDrop();
     updatePlayerCounts();
-}
-
-// 初始化預設玩家（首次使用）
-function initializeDefaultPlayers() {
-    const defaultPositions = {};
-    FIXED_MEMBERS.forEach(name => {
-        defaultPositions[name] = "rest";
-    });
-    
-    db.doc(FIRESTORE_DOC).set({
-        players: defaultPositions,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-}
-
-// 從本地備份載入
-function loadFromLocalBackup() {
-    const backup = localStorage.getItem("badminton-backup");
-    if (backup) {
-        const positions = JSON.parse(backup);
-        renderPlayers(positions);
-        console.log("📂 從本地備份載入");
-    } else {
-        // 沒有備份，載入固定成員
-        const defaultPositions = {};
-        FIXED_MEMBERS.forEach(name => {
-            defaultPositions[name] = "rest";
-        });
-        renderPlayers(defaultPositions);
-    }
-}
-
-// 連線狀態指示器
-function updateConnectionStatus(online) {
-    let indicator = document.getElementById("connection-status");
-    if (!indicator) {
-        indicator = document.createElement("div");
-        indicator.id = "connection-status";
-        indicator.style.cssText = `
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            padding: 8px 15px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
-            z-index: 9999;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        `;
-        document.body.appendChild(indicator);
-    }
-    
-    if (online) {
-        indicator.innerHTML = '<span style="color: #2ecc71;">●</span> 已同步';
-        indicator.style.background = "rgba(46, 204, 113, 0.2)";
-        indicator.style.color = "#27ae60";
-    } else {
-        indicator.innerHTML = '<span style="color: #e74c3c;">●</span> 離線模式';
-        indicator.style.background = "rgba(231, 76, 60, 0.2)";
-        indicator.style.color = "#c0392b";
-    }
-}
-
-// 載入中指示器
-function showLoadingIndicator() {
-    let loader = document.getElementById("loading-indicator");
-    if (!loader) {
-        loader = document.createElement("div");
-        loader.id = "loading-indicator";
-        loader.innerHTML = "⏳ 連線中...";
-        loader.style.cssText = `
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            padding: 20px 40px;
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 5px 30px rgba(0,0,0,0.2);
-            font-size: 18px;
-            z-index: 10000;
-        `;
-        document.body.appendChild(loader);
-    }
-}
-
-function hideLoadingIndicator() {
-    const loader = document.getElementById("loading-indicator");
-    if (loader) loader.remove();
 }
 
 function addPlayer() {
@@ -234,21 +90,8 @@ function addPlayer() {
 }
 
 function resetAll() {
-    if (!confirm("確定要重置所有資料嗎？這會影響所有人的畫面！")) return;
-    
     document.querySelectorAll(".list").forEach(list => list.innerHTML = "");
-    
-    // 重置為固定成員
-    const defaultPositions = {};
-    FIXED_MEMBERS.forEach(name => {
-        defaultPositions[name] = "rest";
-    });
-    
-    db.doc(FIRESTORE_DOC).set({
-        players: defaultPositions,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    
+    localStorage.removeItem(STORAGE_KEY);
     updatePlayerCounts();
 }
 
@@ -397,14 +240,12 @@ function rearrangeWaitingQueues() {
     const wait2 = document.getElementById("wait2");
     const wait3 = document.getElementById("wait3");
     
-    // 將 wait2 的人移到 wait1
     if (wait2 && wait2.children.length > 0) {
         while (wait2.children.length > 0) {
             wait1.appendChild(wait2.firstElementChild);
         }
     }
     
-    // 將 wait3 的人移到 wait2
     if (wait3 && wait3.children.length > 0) {
         while (wait3.children.length > 0) {
             wait2.appendChild(wait3.firstElementChild);
@@ -795,11 +636,4 @@ window.onclick = function(event) {
 
 window.onload = function() {
     loadPlayers();
-};
-
-// 頁面關閉時取消監聽
-window.onbeforeunload = function() {
-    if (unsubscribe) {
-        unsubscribe();
-    }
 };
