@@ -172,12 +172,27 @@ function closeDeleteModal() {
 }
 
 function onPlayerClick(e) {
+    // 阻止事件冒泡
+    if (e.stopPropagation) e.stopPropagation();
+    if (e.preventDefault) e.preventDefault();
+    
     // 確保取得正確的 player-box 元素（避免點到偽元素）
-    const player = e.target.closest(".player-box");
-    if (!player) return;
+    const player = e.target.closest ? e.target.closest(".player-box") : e.target;
+    if (!player || !player.classList.contains("player-box")) return;
+    
+    // 防止短時間內重複點擊同一個或不同的玩家（300ms 內只能處理一次）
+    const now = Date.now();
+    if (now - lastClickTime < 300) {
+        console.log("防止重複點擊");
+        return;
+    }
+    lastClickTime = now;
+    lastClickedPlayer = player;
     
     const playerName = player.innerText;
-    const parentId = player.parentElement.id;
+    const parentId = player.parentElement ? player.parentElement.id : null;
+    
+    if (!parentId) return;
     
     if (parentId === "rest") {
         // 從休息區點擊 → 進入可用場地
@@ -187,13 +202,16 @@ function onPlayerClick(e) {
             console.log(`${playerName} 進入 ${targetCourt.id}`);
         } else {
             alert("所有場地都滿了！請等待。");
+            return; // 不需要儲存
         }
     } else if (parentId.startsWith("court")) {
         // 從場地點擊 → 返回休息區
         document.getElementById("rest").appendChild(player);
         console.log(`${playerName} 返回休息區`);
+    } else {
+        // 等待區的成員點擊不做任何事（需要用拖曳）
+        return;
     }
-    // 等待區的成員點擊不做任何事（需要用拖曳）
     
     savePlayers();
     updatePlayerCounts();
@@ -271,6 +289,10 @@ let touchStartY = 0;
 let touchStartTime = 0;
 let isTouchDragging = false;
 let touchClone = null;
+
+// 防止重複點擊
+let lastClickTime = 0;
+let lastClickedPlayer = null;
 
 function initDragDrop() {
     // 為所有 player-box 綁定拖曳事件（移除舊的再綁定新的）
@@ -419,18 +441,22 @@ function touchMove(e) {
 function touchEnd(e) {
     if (!draggedElement) return;
     
+    // 阻止後續的 click 事件
+    e.preventDefault();
+    
     const touchDuration = Date.now() - touchStartTime;
+    const currentPlayer = draggedElement; // 保存引用
     
     if (isTouchDragging) {
         // 是拖曳操作 - 找到放置目標
         const touch = e.changedTouches[0];
         const dropZone = getDropZoneAtPoint(touch.clientX, touch.clientY);
         
-        if (dropZone && dropZone !== draggedElement.parentElement) {
-            dropZone.appendChild(draggedElement);
+        if (dropZone && dropZone !== currentPlayer.parentElement) {
+            dropZone.appendChild(currentPlayer);
             savePlayers();
             updatePlayerCounts();
-            console.log(`${draggedElement.innerText} 移動到 ${dropZone.id}`);
+            console.log(`${currentPlayer.innerText} 移動到 ${dropZone.id}`);
         }
         
         // 清理拖曳狀態
@@ -438,7 +464,7 @@ function touchEnd(e) {
             touchClone.remove();
             touchClone = null;
         }
-        draggedElement.style.opacity = "1";
+        currentPlayer.style.opacity = "1";
         clearDragOver();
         
         // 恢復頁面滾動
@@ -446,11 +472,46 @@ function touchEnd(e) {
         
     } else if (touchDuration < 300) {
         // 是點擊操作（短於 300ms）
-        onPlayerClick({ target: draggedElement });
+        // 直接處理點擊邏輯，而不是調用 onPlayerClick
+        handlePlayerTap(currentPlayer);
     }
     
     draggedElement = null;
     isTouchDragging = false;
+}
+
+// 處理觸控點擊（獨立函數避免重複觸發）
+function handlePlayerTap(player) {
+    if (!player || !player.parentElement) return;
+    
+    const playerName = player.innerText;
+    const parentId = player.parentElement.id;
+    
+    // 防止短時間內重複點擊
+    const now = Date.now();
+    if (now - lastClickTime < 300) {
+        console.log("防止重複點擊（觸控）");
+        return;
+    }
+    lastClickTime = now;
+    
+    if (parentId === "rest") {
+        const targetCourt = findAvailableCourt();
+        if (targetCourt) {
+            targetCourt.appendChild(player);
+            console.log(`${playerName} 進入 ${targetCourt.id}（觸控）`);
+            savePlayers();
+            updatePlayerCounts();
+        } else {
+            alert("所有場地都滿了！請等待。");
+        }
+    } else if (parentId.startsWith("court")) {
+        document.getElementById("rest").appendChild(player);
+        console.log(`${playerName} 返回休息區（觸控）`);
+        savePlayers();
+        updatePlayerCounts();
+    }
+    // 等待區不做處理
 }
 
 // 根據座標找到放置區域
