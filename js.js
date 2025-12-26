@@ -289,6 +289,7 @@ let touchStartY = 0;
 let touchStartTime = 0;
 let isTouchDragging = false;
 let touchClone = null;
+let isTouchActive = false; // 新增：標記是否正在處理觸控
 
 // 防止重複點擊
 let lastClickTime = 0;
@@ -301,8 +302,16 @@ function initDragDrop() {
         const newBox = box.cloneNode(true);
         box.parentNode.replaceChild(newBox, box);
         
-        // 重新綁定事件
-        newBox.addEventListener("click", onPlayerClick);
+        // 重新綁定事件 - 電腦點擊（只在非觸控設備使用）
+        newBox.addEventListener("click", function(e) {
+            // 如果剛剛有觸控操作，忽略這個 click 事件
+            if (Date.now() - lastClickTime < 500) {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+            }
+            onPlayerClick(e);
+        });
         
         // 電腦拖曳事件
         newBox.addEventListener("dragstart", dragStart);
@@ -312,6 +321,7 @@ function initDragDrop() {
         newBox.addEventListener("touchstart", touchStart, { passive: false });
         newBox.addEventListener("touchmove", touchMove, { passive: false });
         newBox.addEventListener("touchend", touchEnd, { passive: false });
+        newBox.addEventListener("touchcancel", touchCancel, { passive: false });
     });
     
     // Drop zones 只需要初始化一次
@@ -324,6 +334,23 @@ function initDragDrop() {
         });
         dropZonesInitialized = true;
     }
+}
+
+// 觸控取消事件
+function touchCancel(e) {
+    // 清理所有狀態
+    if (touchClone) {
+        touchClone.remove();
+        touchClone = null;
+    }
+    if (draggedElement) {
+        draggedElement.style.opacity = "1";
+    }
+    draggedElement = null;
+    isTouchDragging = false;
+    isTouchActive = false;
+    clearDragOver();
+    document.body.classList.remove("touch-dragging-active");
 }
 
 // ===== 電腦拖曳 =====
@@ -383,8 +410,18 @@ function clearDragOver() {
 
 // ===== 手機觸控拖曳 =====
 function touchStart(e) {
+    // 如果已經有觸控在進行中，忽略新的觸控
+    if (isTouchActive) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+    }
+    
     const player = e.target.closest(".player-box");
     if (!player) return;
+    
+    // 標記觸控開始
+    isTouchActive = true;
     
     const touch = e.touches[0];
     touchStartX = touch.clientX;
@@ -393,6 +430,9 @@ function touchStart(e) {
     isTouchDragging = false;
     
     draggedElement = player;
+    
+    // 阻止事件傳播到其他元素
+    e.stopPropagation();
 }
 
 function touchMove(e) {
@@ -439,15 +479,26 @@ function touchMove(e) {
 }
 
 function touchEnd(e) {
-    if (!draggedElement) return;
-    
-    // 阻止後續的 click 事件
+    // 阻止後續的 click 事件和事件傳播
     e.preventDefault();
+    e.stopPropagation();
+    
+    if (!draggedElement || !isTouchActive) {
+        // 重置狀態
+        isTouchActive = false;
+        draggedElement = null;
+        isTouchDragging = false;
+        return;
+    }
     
     const touchDuration = Date.now() - touchStartTime;
     const currentPlayer = draggedElement; // 保存引用
     
-    if (isTouchDragging) {
+    // 先重置全局狀態，防止其他事件干擾
+    draggedElement = null;
+    isTouchDragging = false;
+    
+    if (touchClone) {
         // 是拖曳操作 - 找到放置目標
         const touch = e.changedTouches[0];
         const dropZone = getDropZoneAtPoint(touch.clientX, touch.clientY);
@@ -460,10 +511,8 @@ function touchEnd(e) {
         }
         
         // 清理拖曳狀態
-        if (touchClone) {
-            touchClone.remove();
-            touchClone = null;
-        }
+        touchClone.remove();
+        touchClone = null;
         currentPlayer.style.opacity = "1";
         clearDragOver();
         
@@ -472,12 +521,14 @@ function touchEnd(e) {
         
     } else if (touchDuration < 300) {
         // 是點擊操作（短於 300ms）
-        // 直接處理點擊邏輯，而不是調用 onPlayerClick
+        // 直接處理點擊邏輯
         handlePlayerTap(currentPlayer);
     }
     
-    draggedElement = null;
-    isTouchDragging = false;
+    // 延遲重置 isTouchActive，防止快速連續觸控
+    setTimeout(() => {
+        isTouchActive = false;
+    }, 100);
 }
 
 // 處理觸控點擊（獨立函數避免重複觸發）
@@ -487,13 +538,16 @@ function handlePlayerTap(player) {
     const playerName = player.innerText;
     const parentId = player.parentElement.id;
     
-    // 防止短時間內重複點擊
+    // 防止短時間內重複點擊（500ms）
     const now = Date.now();
-    if (now - lastClickTime < 300) {
-        console.log("防止重複點擊（觸控）");
+    if (now - lastClickTime < 500) {
+        console.log("防止重複點擊（觸控）", playerName);
         return;
     }
     lastClickTime = now;
+    lastClickedPlayer = player;
+    
+    console.log(`處理點擊: ${playerName}, 位置: ${parentId}`);
     
     if (parentId === "rest") {
         const targetCourt = findAvailableCourt();
