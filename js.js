@@ -12,6 +12,11 @@ const FIXED_MEMBERS = [
     "宥蓁"
 ];
 
+// ===== Firebase 設定 =====
+const FIRESTORE_DOC = "games/badminton"; // Firestore 文件路徑
+let isOnline = false;
+let unsubscribe = null; // 用於取消監聽
+
 function createPlayer(name, isFixed = false) {
     const div = document.createElement("div");
     div.className = "player-box";
@@ -24,10 +29,10 @@ function createPlayer(name, isFixed = false) {
     return div;
 }
 
-const STORAGE_KEY = "badminton-players";
 const MAX_PLAYERS_PER_COURT = 4;
 const MAX_PLAYERS_PER_WAIT = 4;
 
+// ===== Firebase 儲存（即時同步）=====
 function savePlayers() {
     const allPlayers = {};
     document.querySelectorAll(".player-box").forEach(box => {
@@ -35,13 +40,57 @@ function savePlayers() {
         const parentId = box.parentElement.id;
         allPlayers[name] = parentId;
     });
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(allPlayers));
+    
+    // 儲存到 Firebase
+    db.doc(FIRESTORE_DOC).set({
+        players: allPlayers,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(() => {
+        console.log("✅ 資料已同步到雲端");
+    }).catch(error => {
+        console.error("❌ 同步失敗:", error);
+        // 失敗時備份到 localStorage
+        localStorage.setItem("badminton-backup", JSON.stringify(allPlayers));
+    });
 }
 
+// ===== Firebase 載入（即時監聽）=====
 function loadPlayers() {
-    const data = localStorage.getItem(STORAGE_KEY);
-    const positions = data ? JSON.parse(data) : {};
+    showLoadingIndicator();
     
+    // 設定即時監聽
+    unsubscribe = db.doc(FIRESTORE_DOC).onSnapshot(
+        (doc) => {
+            isOnline = true;
+            updateConnectionStatus(true);
+            
+            if (doc.exists) {
+                const data = doc.data();
+                const positions = data.players || {};
+                renderPlayers(positions);
+                console.log("📥 收到雲端資料更新");
+            } else {
+                // 文件不存在，初始化固定成員
+                console.log("📝 初始化資料...");
+                initializeDefaultPlayers();
+            }
+            
+            hideLoadingIndicator();
+        },
+        (error) => {
+            console.error("❌ 監聽錯誤:", error);
+            isOnline = false;
+            updateConnectionStatus(false);
+            
+            // 離線時從 localStorage 載入
+            loadFromLocalBackup();
+            hideLoadingIndicator();
+        }
+    );
+}
+
+// 渲染玩家（根據位置資料）
+function renderPlayers(positions) {
     const areas = {
         "rest": document.getElementById("rest"),
         "court1": document.getElementById("court1"),
@@ -52,7 +101,12 @@ function loadPlayers() {
         "wait3": document.getElementById("wait3")
     };
     
-    // 1. 先載入固定成員（每次開啟都會出現）
+    // 清空所有區域
+    Object.values(areas).forEach(area => {
+        if (area) area.innerHTML = "";
+    });
+    
+    // 1. 先載入固定成員
     FIXED_MEMBERS.forEach(name => {
         const areaId = positions[name] || "rest";
         if (areas[areaId]) {
@@ -62,9 +116,8 @@ function loadPlayers() {
         }
     });
     
-    // 2. 再載入非固定成員（臨時新增的）
+    // 2. 再載入非固定成員
     Object.entries(positions).forEach(([name, areaId]) => {
-        // 跳過固定成員（已經載入過了）
         if (FIXED_MEMBERS.includes(name)) return;
         
         if (areas[areaId]) {
@@ -76,6 +129,97 @@ function loadPlayers() {
     
     initDragDrop();
     updatePlayerCounts();
+}
+
+// 初始化預設玩家（首次使用）
+function initializeDefaultPlayers() {
+    const defaultPositions = {};
+    FIXED_MEMBERS.forEach(name => {
+        defaultPositions[name] = "rest";
+    });
+    
+    db.doc(FIRESTORE_DOC).set({
+        players: defaultPositions,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+}
+
+// 從本地備份載入
+function loadFromLocalBackup() {
+    const backup = localStorage.getItem("badminton-backup");
+    if (backup) {
+        const positions = JSON.parse(backup);
+        renderPlayers(positions);
+        console.log("📂 從本地備份載入");
+    } else {
+        // 沒有備份，載入固定成員
+        const defaultPositions = {};
+        FIXED_MEMBERS.forEach(name => {
+            defaultPositions[name] = "rest";
+        });
+        renderPlayers(defaultPositions);
+    }
+}
+
+// 連線狀態指示器
+function updateConnectionStatus(online) {
+    let indicator = document.getElementById("connection-status");
+    if (!indicator) {
+        indicator = document.createElement("div");
+        indicator.id = "connection-status";
+        indicator.style.cssText = `
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        `;
+        document.body.appendChild(indicator);
+    }
+    
+    if (online) {
+        indicator.innerHTML = '<span style="color: #2ecc71;">●</span> 已同步';
+        indicator.style.background = "rgba(46, 204, 113, 0.2)";
+        indicator.style.color = "#27ae60";
+    } else {
+        indicator.innerHTML = '<span style="color: #e74c3c;">●</span> 離線模式';
+        indicator.style.background = "rgba(231, 76, 60, 0.2)";
+        indicator.style.color = "#c0392b";
+    }
+}
+
+// 載入中指示器
+function showLoadingIndicator() {
+    let loader = document.getElementById("loading-indicator");
+    if (!loader) {
+        loader = document.createElement("div");
+        loader.id = "loading-indicator";
+        loader.innerHTML = "⏳ 連線中...";
+        loader.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 20px 40px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 30px rgba(0,0,0,0.2);
+            font-size: 18px;
+            z-index: 10000;
+        `;
+        document.body.appendChild(loader);
+    }
+}
+
+function hideLoadingIndicator() {
+    const loader = document.getElementById("loading-indicator");
+    if (loader) loader.remove();
 }
 
 function addPlayer() {
@@ -90,8 +234,21 @@ function addPlayer() {
 }
 
 function resetAll() {
+    if (!confirm("確定要重置所有資料嗎？這會影響所有人的畫面！")) return;
+    
     document.querySelectorAll(".list").forEach(list => list.innerHTML = "");
-    localStorage.removeItem(STORAGE_KEY);
+    
+    // 重置為固定成員
+    const defaultPositions = {};
+    FIXED_MEMBERS.forEach(name => {
+        defaultPositions[name] = "rest";
+    });
+    
+    db.doc(FIRESTORE_DOC).set({
+        players: defaultPositions,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    
     updatePlayerCounts();
 }
 
@@ -108,7 +265,6 @@ function showDeleteModal() {
     playerList.innerHTML = "";
     selectedPlayers = [];
     
-    // 取得區域顯示名稱
     function getAreaName(areaId) {
         if (areaId === "rest") return "休息區";
         if (areaId.startsWith("court")) return `場地 ${areaId.replace("court", "")}`;
@@ -124,7 +280,6 @@ function showDeleteModal() {
         const div = document.createElement("div");
         div.className = "player-checkbox";
         
-        // 固定成員加上標記
         const fixedBadge = isFixed ? '<span class="fixed-badge">季繳</span>' : '';
         const fixedNote = isFixed ? ' <small style="color:#999">(重開瀏覽器會恢復)</small>' : '';
         
@@ -172,15 +327,12 @@ function closeDeleteModal() {
 }
 
 function onPlayerClick(e) {
-    // 阻止事件冒泡
     if (e.stopPropagation) e.stopPropagation();
     if (e.preventDefault) e.preventDefault();
     
-    // 確保取得正確的 player-box 元素（避免點到偽元素）
     const player = e.target.closest ? e.target.closest(".player-box") : e.target;
     if (!player || !player.classList.contains("player-box")) return;
     
-    // 防止短時間內重複點擊同一個或不同的玩家（300ms 內只能處理一次）
     const now = Date.now();
     if (now - lastClickTime < 300) {
         console.log("防止重複點擊");
@@ -195,21 +347,18 @@ function onPlayerClick(e) {
     if (!parentId) return;
     
     if (parentId === "rest") {
-        // 從休息區點擊 → 進入可用場地
         const targetCourt = findAvailableCourt();
         if (targetCourt) {
             targetCourt.appendChild(player);
             console.log(`${playerName} 進入 ${targetCourt.id}`);
         } else {
             alert("所有場地都滿了！請等待。");
-            return; // 不需要儲存
+            return;
         }
     } else if (parentId.startsWith("court")) {
-        // 從場地點擊 → 返回休息區
         document.getElementById("rest").appendChild(player);
         console.log(`${playerName} 返回休息區`);
     } else {
-        // 等待區的成員點擊不做任何事（需要用拖曳）
         return;
     }
     
@@ -241,30 +390,26 @@ function moveWait1ToCourt(court) {
            wait1.children.length > 0) {
         court.appendChild(wait1.firstElementChild);
     }
-    console.log(`等待1的 ${MAX_PLAYERS_PER_COURT - court.children.length} 人上場 ${court.id}`);
 }
 
 function rearrangeWaitingQueues() {
     const wait1 = document.getElementById("wait1");
-    if (wait1) wait1.innerHTML = "";
-    
     const wait2 = document.getElementById("wait2");
+    const wait3 = document.getElementById("wait3");
+    
+    // 將 wait2 的人移到 wait1
     if (wait2 && wait2.children.length > 0) {
         while (wait2.children.length > 0) {
             wait1.appendChild(wait2.firstElementChild);
         }
-        console.log("等待2 → 等待1");
     }
     
-    const wait3 = document.getElementById("wait3");
+    // 將 wait3 的人移到 wait2
     if (wait3 && wait3.children.length > 0) {
         while (wait3.children.length > 0) {
             wait2.appendChild(wait3.firstElementChild);
         }
-        console.log("等待3 → 等待2");
     }
-    
-    if (wait3) wait3.innerHTML = "";
 }
 
 function findAvailableCourt() {
@@ -283,28 +428,22 @@ function findAvailableCourt() {
 let draggedElement = null;
 let dropZonesInitialized = false;
 
-// 觸控相關變數
 let touchStartX = 0;
 let touchStartY = 0;
 let touchStartTime = 0;
 let isTouchDragging = false;
 let touchClone = null;
-let isTouchActive = false; // 新增：標記是否正在處理觸控
+let isTouchActive = false;
 
-// 防止重複點擊
 let lastClickTime = 0;
 let lastClickedPlayer = null;
 
 function initDragDrop() {
-    // 為所有 player-box 綁定拖曳事件（移除舊的再綁定新的）
     document.querySelectorAll(".player-box").forEach(box => {
-        // 移除舊的事件監聽器（使用 clone 技巧）
         const newBox = box.cloneNode(true);
         box.parentNode.replaceChild(newBox, box);
         
-        // 重新綁定事件 - 電腦點擊（只在非觸控設備使用）
         newBox.addEventListener("click", function(e) {
-            // 如果剛剛有觸控操作，忽略這個 click 事件
             if (Date.now() - lastClickTime < 500) {
                 e.preventDefault();
                 e.stopPropagation();
@@ -313,18 +452,15 @@ function initDragDrop() {
             onPlayerClick(e);
         });
         
-        // 電腦拖曳事件
         newBox.addEventListener("dragstart", dragStart);
         newBox.addEventListener("dragend", dragEnd);
         
-        // 手機觸控事件
         newBox.addEventListener("touchstart", touchStart, { passive: false });
         newBox.addEventListener("touchmove", touchMove, { passive: false });
         newBox.addEventListener("touchend", touchEnd, { passive: false });
         newBox.addEventListener("touchcancel", touchCancel, { passive: false });
     });
     
-    // Drop zones 只需要初始化一次
     if (!dropZonesInitialized) {
         const dropZones = document.querySelectorAll(".list");
         dropZones.forEach(zone => {
@@ -336,9 +472,7 @@ function initDragDrop() {
     }
 }
 
-// 觸控取消事件
 function touchCancel(e) {
-    // 清理所有狀態
     if (touchClone) {
         touchClone.remove();
         touchClone = null;
@@ -353,7 +487,6 @@ function touchCancel(e) {
     document.body.classList.remove("touch-dragging-active");
 }
 
-// ===== 電腦拖曳 =====
 function dragStart(e) {
     const player = e.target.closest(".player-box");
     if (!player) return;
@@ -408,9 +541,7 @@ function clearDragOver() {
     });
 }
 
-// ===== 手機觸控拖曳 =====
 function touchStart(e) {
-    // 如果已經有觸控在進行中，忽略新的觸控
     if (isTouchActive) {
         e.preventDefault();
         e.stopPropagation();
@@ -420,7 +551,6 @@ function touchStart(e) {
     const player = e.target.closest(".player-box");
     if (!player) return;
     
-    // 標記觸控開始
     isTouchActive = true;
     
     const touch = e.touches[0];
@@ -431,7 +561,6 @@ function touchStart(e) {
     
     draggedElement = player;
     
-    // 阻止事件傳播到其他元素
     e.stopPropagation();
 }
 
@@ -442,13 +571,11 @@ function touchMove(e) {
     const deltaX = Math.abs(touch.clientX - touchStartX);
     const deltaY = Math.abs(touch.clientY - touchStartY);
     
-    // 移動超過 10px 才視為拖曳
     if (deltaX > 10 || deltaY > 10) {
         isTouchDragging = true;
         e.preventDefault();
         e.stopPropagation();
         
-        // 建立拖曳中的視覺複製品
         if (!touchClone) {
             touchClone = draggedElement.cloneNode(true);
             touchClone.classList.add("touch-dragging");
@@ -460,31 +587,25 @@ function touchMove(e) {
             touchClone.style.boxShadow = "0 5px 20px rgba(0,0,0,0.3)";
             document.body.appendChild(touchClone);
             
-            // 防止頁面滾動
             document.body.classList.add("touch-dragging-active");
             
-            // 原始元素變透明
             draggedElement.style.opacity = "0.3";
         }
         
-        // 更新複製品位置（置中於手指）
         const boxWidth = touchClone.offsetWidth;
         const boxHeight = touchClone.offsetHeight;
         touchClone.style.left = (touch.clientX - boxWidth / 2) + "px";
         touchClone.style.top = (touch.clientY - boxHeight / 2) + "px";
         
-        // 檢查手指下方的放置區域
         highlightDropZone(touch.clientX, touch.clientY);
     }
 }
 
 function touchEnd(e) {
-    // 阻止後續的 click 事件和事件傳播
     e.preventDefault();
     e.stopPropagation();
     
     if (!draggedElement || !isTouchActive) {
-        // 重置狀態
         isTouchActive = false;
         draggedElement = null;
         isTouchDragging = false;
@@ -492,14 +613,12 @@ function touchEnd(e) {
     }
     
     const touchDuration = Date.now() - touchStartTime;
-    const currentPlayer = draggedElement; // 保存引用
+    const currentPlayer = draggedElement;
     
-    // 先重置全局狀態，防止其他事件干擾
     draggedElement = null;
     isTouchDragging = false;
     
     if (touchClone) {
-        // 是拖曳操作 - 找到放置目標
         const touch = e.changedTouches[0];
         const dropZone = getDropZoneAtPoint(touch.clientX, touch.clientY);
         
@@ -510,35 +629,28 @@ function touchEnd(e) {
             console.log(`${currentPlayer.innerText} 移動到 ${dropZone.id}`);
         }
         
-        // 清理拖曳狀態
         touchClone.remove();
         touchClone = null;
         currentPlayer.style.opacity = "1";
         clearDragOver();
         
-        // 恢復頁面滾動
         document.body.classList.remove("touch-dragging-active");
         
     } else if (touchDuration < 300) {
-        // 是點擊操作（短於 300ms）
-        // 直接處理點擊邏輯
         handlePlayerTap(currentPlayer);
     }
     
-    // 延遲重置 isTouchActive，防止快速連續觸控
     setTimeout(() => {
         isTouchActive = false;
     }, 100);
 }
 
-// 處理觸控點擊（獨立函數避免重複觸發）
 function handlePlayerTap(player) {
     if (!player || !player.parentElement) return;
     
     const playerName = player.innerText;
     const parentId = player.parentElement.id;
     
-    // 防止短時間內重複點擊（500ms）
     const now = Date.now();
     if (now - lastClickTime < 500) {
         console.log("防止重複點擊（觸控）", playerName);
@@ -565,12 +677,9 @@ function handlePlayerTap(player) {
         savePlayers();
         updatePlayerCounts();
     }
-    // 等待區不做處理
 }
 
-// 根據座標找到放置區域
 function getDropZoneAtPoint(x, y) {
-    // 暫時隱藏複製品以便偵測下方元素
     if (touchClone) {
         touchClone.style.display = "none";
     }
@@ -593,7 +702,6 @@ function getDropZoneAtPoint(x, y) {
     return null;
 }
 
-// 高亮手指下方的放置區域
 function highlightDropZone(x, y) {
     clearDragOver();
     const dropZone = getDropZoneAtPoint(x, y);
@@ -687,6 +795,11 @@ window.onclick = function(event) {
 
 window.onload = function() {
     loadPlayers();
-    // initDragDrop() 已經在 loadPlayers() 中調用
-    // updatePlayerCounts() 已經在 loadPlayers() 中調用
+};
+
+// 頁面關閉時取消監聽
+window.onbeforeunload = function() {
+    if (unsubscribe) {
+        unsubscribe();
+    }
 };
